@@ -1,0 +1,52 @@
+ManifestFileVersion: 0
+CRC: 2441295336
+Hashes:
+  AssetFileHash:
+    serializedVersion: 2
+    Hash: 114f721de066c0f6da64ed3224287d99
+  TypeTreeHash:
+    serializedVersion: 2
+    Hash: c51263dbe1e20beb9ad98ea303ed841c
+HashAppended: 0
+ClassTypes:
+- Class: 1
+  Script: {instanceID: 0}
+- Class: 4
+  Script: {instanceID: 0}
+- Class: 21
+  Script: {instanceID: 0}
+- Class: 23
+  Script: {instanceID: 0}
+- Class: 28
+  Script: {instanceID: 0}
+- Class: 33
+  Script: {instanceID: 0}
+- Class: 43
+  Script: {instanceID: 0}
+- Class: 48
+  Script: {instanceID: 0}
+- Class: 114
+  Script: {fileID: 11500000, guid: 48a79b01ea5641d4aa6daa2e23605641, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 8e6292b2c06870d4495f009f912b9600, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 40b924e2dad56384a8df2a1e111bb675, type: 3}
+- Class: 114
+  Script: {fileID: 11500000, guid: 8d2ffa0e51a319a40aa7573dbc665684, type: 3}
+- Class: 115
+  Script: {instanceID: 0}
+- Class: 135
+  Script: {instanceID: 0}
+- Class: 198
+  Script: {instanceID: 0}
+- Class: 199
+  Script: {instanceID: 0}
+- Class: 213
+  Script: {instanceID: 0}
+Assets:
+- Assets/CRCore3/Artifact/ArtifactChampionsOn.png
+- Assets/CRCore3/Artifact/ArtifactChampionsOff.png
+- Assets/CRCore3/Prefabs/VoidRift.prefab
+- Assets/CRCore3/PostProcess/voidSafePPP.asset
+- Assets/CRCore3/PostProcess/voidSickPPP.asset
+Dependencies: []
