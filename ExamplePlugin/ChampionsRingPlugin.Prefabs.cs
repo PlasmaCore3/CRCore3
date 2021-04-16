@@ -38,6 +38,23 @@ namespace ChampionsRingPlugin.Prefabs
             missionController.target.holdoutZoneController.radiusIndicator.material = UnityEngine.Object.Instantiate<Material>(voidCellBaseInidicatorMat);
             missionController.target.holdoutZoneController.radiusIndicator.material.SetVector("_TintColor", new Vector4(0.5f, 0.0f, 1.0f, 0.75f));
 
+            GameObject teleRift = GameObject.Instantiate(Assets.teleporterRift);
+            teleRift.transform.SetParent(corruptedTeleporter.transform);
+            teleRift.transform.localPosition = new Vector3(0.0f, 8.0f, 0.0f);
+
+            RotateObject teleEffectRotator = teleRift.AddComponent<RotateObject>();
+            teleEffectRotator.rotationSpeed = new Vector3(0.0f, 35.0f, 0.0f);
+
+            ChildLocator teleporterChildLocator = teleRift.GetComponent<ChildLocator>();
+            teleporterChildLocator.FindChild("DistortionParticle").GetComponent<ParticleSystemRenderer>().material = UnityEngine.Object.Instantiate<Material>(distortionMat);
+            teleporterChildLocator.FindChild("OrbsModel").GetComponent<MeshRenderer>().material = UnityEngine.Object.Instantiate<Material>(voidCellReaverFoamMat);
+            teleporterChildLocator.FindChild("OrbN").GetComponentInChildren<MeshRenderer>().material = UnityEngine.Object.Instantiate<Material>(voidCellReaverFoamMat);
+            teleporterChildLocator.FindChild("OrbE").GetComponentInChildren<MeshRenderer>().material = UnityEngine.Object.Instantiate<Material>(voidCellReaverFoamMat);
+            teleporterChildLocator.FindChild("OrbS").GetComponentInChildren<MeshRenderer>().material = UnityEngine.Object.Instantiate<Material>(voidCellReaverFoamMat);
+            teleporterChildLocator.FindChild("OrbW").GetComponentInChildren<MeshRenderer>().material = UnityEngine.Object.Instantiate<Material>(voidCellReaverFoamMat);
+
+            missionController.orbLocator = teleporterChildLocator;
+
 
             var teleporterDirectors = corruptedTeleporter.GetComponents<CombatDirector>();
 
@@ -62,7 +79,7 @@ namespace ChampionsRingPlugin.Prefabs
             teamFilter1.defaultTeam = TeamIndex.Player;
 
             missionController.protectionWard = protectionWardGO.AddComponent<BuffWard>();
-            missionController.protectionWard.buffDef = CRContentPack.protectionBuffDef;
+            missionController.protectionWard.buffDef = CRContentPackProvider.protectionBuffDef;
             missionController.protectionWard.buffDuration = 0.5f;
             missionController.protectionWard.interval = 0.25f;
             missionController.protectionWard.radius = 15;
@@ -83,7 +100,7 @@ namespace ChampionsRingPlugin.Prefabs
             teamFilter2.defaultTeam = TeamIndex.Player;
 
             missionController.voidWard = voidWardGO.AddComponent<BuffWard>();
-            missionController.voidWard.buffDef = CRContentPack.voidDebuffDef;
+            missionController.voidWard.buffDef = CRContentPackProvider.voidDebuffDef;
             missionController.voidWard.buffDuration = 0.5f;
             missionController.voidWard.interval = 0.25f;
             missionController.voidWard.radius = 75;
@@ -116,6 +133,7 @@ namespace ChampionsRingPlugin.Prefabs
                 missionController.directors[i].customName = "CRDirector" + i.ToString();
                 missionController.directors[i].monsterCredit = 0;
                 missionController.directors[i].expRewardCoefficient = 0.2f;
+                missionController.directors[i].moneyWaveIntervals = new RangeFloat[1] { new RangeFloat() { min = 0.75f, max = 0.75f } };
                 missionController.directors[i].minSeriesSpawnInterval = 0.1f;
                 missionController.directors[i].maxSeriesSpawnInterval = 1;
                 missionController.directors[i].minRerollSpawnInterval = 2.333f;
@@ -140,6 +158,7 @@ namespace ChampionsRingPlugin.Prefabs
             #endregion
             //////////
             #region VoidRifts
+            // add custom position indicator and radar scannar icon
             voidRift = GameObject.Instantiate(Assets.voidRift);
             voidRift.transform.GetChild(0).GetComponentInChildren<MeshRenderer>().material = UnityEngine.Object.Instantiate<Material>(missionController.target.holdoutZoneController.radiusIndicator.material);
 
@@ -153,10 +172,10 @@ namespace ChampionsRingPlugin.Prefabs
 
             var voidRiftHoldoutZone = voidRift.AddComponent<HoldoutZoneController>();
             voidRiftHoldoutZone.enabled = false;
-            voidRiftHoldoutZone.baseRadius = 20;
+            voidRiftHoldoutZone.baseRadius = 22;
             voidRiftHoldoutZone.minimumRadius = 4;
             voidRiftHoldoutZone.chargeRadiusDelta = 0;
-            voidRiftHoldoutZone.baseChargeDuration = 40;
+            voidRiftHoldoutZone.baseChargeDuration = 35;
             voidRiftHoldoutZone.radiusSmoothTime = 1;
             voidRiftHoldoutZone.healingNovaRoot = voidRift.transform.GetChild(0).GetChild(1);
             voidRiftHoldoutZone.inBoundsObjectiveToken = "OBJECTIVE_RIFT_CHARGING_TOKEN";
@@ -194,7 +213,7 @@ namespace ChampionsRingPlugin.Prefabs
             riftEntityLocator.entity = voidRift;
 
             var voidProtectionWard = voidRift.AddComponent<BuffWard>();
-            voidProtectionWard.buffDef = CRContentPack.protectionBuffDef;
+            voidProtectionWard.buffDef = CRContentPackProvider.protectionBuffDef;
             voidProtectionWard.buffDuration = 0.5f;
             voidProtectionWard.interval = 0.25f;
             voidProtectionWard.radius = 0;
@@ -208,10 +227,10 @@ namespace ChampionsRingPlugin.Prefabs
             voidProtectionWard.rangeIndicator = voidRift.transform.GetChild(0).GetChild(0);
 
             var voidRiftWard = voidRift.AddComponent<BuffWard>();
-            voidRiftWard.buffDef = CRContentPack.voidDebuffDef;
+            voidRiftWard.buffDef = CRContentPackProvider.voidDebuffDef;
             voidRiftWard.buffDuration = 0.5f;
             voidRiftWard.interval = 0.25f;
-            voidRiftWard.radius = 100;
+            voidRiftWard.radius = 75;
             voidRiftWard.floorWard = false;
             voidRiftWard.expires = false;
             voidRiftWard.invertTeamFilter = false;
@@ -420,6 +439,7 @@ namespace ChampionsRingPlugin.Prefabs
         public static PostProcessProfile voidSafePPP;
 
         public static GameObject voidRift;
+        public static GameObject teleporterRift;
 
         public static void PopulateAssets()
         {
@@ -447,6 +467,7 @@ namespace ChampionsRingPlugin.Prefabs
             artifactChampionOff = MainAssetBundle.LoadAsset<Sprite>("ArtifactChampionsOff");
 
             voidRift = MainAssetBundle.LoadAsset<GameObject>("VoidRift");
+            teleporterRift = MainAssetBundle.LoadAsset<GameObject>("TeleporterRift");
 
             voidSickPPP = MainAssetBundle.LoadAsset<PostProcessProfile>("voidSickPPP");
             var sickFog = ScriptableObject.CreateInstance<RampFog>();
@@ -461,9 +482,9 @@ namespace ChampionsRingPlugin.Prefabs
             sickFog.fogZero.overrideState = true;
             sickFog.fogColorStart.value = new Color32(130, 65, 62, 0);
             sickFog.fogColorStart.overrideState = true;
-            sickFog.fogColorMid.value = new Color32(43, 51, 65, 180);
+            sickFog.fogColorMid.value = new Color32(43, 51, 65, 100);
             sickFog.fogColorMid.overrideState = true;
-            sickFog.fogColorEnd.value = new Color32(27, 10, 36, 240);
+            sickFog.fogColorEnd.value = new Color32(27, 10, 36, 230);
             sickFog.fogColorEnd.overrideState = true;
             sickFog.skyboxStrength.value = 0.15f;
             sickFog.skyboxStrength.overrideState = true;
@@ -480,11 +501,11 @@ namespace ChampionsRingPlugin.Prefabs
             safeFog.fogOne.overrideState = true;
             safeFog.fogZero.value = -0.032f;
             safeFog.fogZero.overrideState = true;
-            safeFog.fogColorStart.value = new Color32(130, 65, 62, 20);
+            safeFog.fogColorStart.value = new Color32(130, 65, 62, 0);
             safeFog.fogColorStart.overrideState = true;
-            safeFog.fogColorMid.value = new Color32(43, 51, 65, 220);
+            safeFog.fogColorMid.value = new Color32(43, 51, 65, 200);
             safeFog.fogColorMid.overrideState = true;
-            safeFog.fogColorEnd.value = new Color32(27, 10, 36, 250);
+            safeFog.fogColorEnd.value = new Color32(27, 10, 36, 255);
             safeFog.fogColorEnd.overrideState = true;
             safeFog.skyboxStrength.value = 0;
             safeFog.skyboxStrength.overrideState = true;

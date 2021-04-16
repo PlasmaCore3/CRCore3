@@ -1,44 +1,27 @@
 ﻿using ChampionsRingPlugin.EntityStates;
 using ChampionsRingPlugin.Prefabs;
 using RoR2;
+using RoR2.ContentManagement;
 using System;
+using System.Collections;
 using UnityEngine;
 
 namespace ChampionsRingPlugin.Content
 {
-    public class CRContentPack : ContentPack
+    public class CRContentPackProvider : IContentPackProvider
     {
-        public static bool initalized = false;
+        public string identifier => "CRContent";
 
-        public static ArtifactDef artifactCR;
-        public static UnlockableDef artifactCRUnlockable;
+        internal static ContentPack ContentPack = new ContentPack();
 
         public static BuffDef voidDebuffDef;
         public static BuffDef protectionBuffDef;
+        public static ArtifactDef artifactCR;
 
-        public CRContentPack()
+        internal static void Init()
         {
-            if (!initalized)
-            {
-                Init();
-            }
-            base.artifactDefs = new ArtifactDef[1];
+            ContentManager.collectContentPackProviders += AddCustomContent;
 
-            artifactDefs[0] = artifactCR;
-
-            base.buffDefs = new BuffDef[2];
-            buffDefs[0] = voidDebuffDef;
-            buffDefs[1] = protectionBuffDef;
-
-            base.entityStateTypes = new Type[4];
-            entityStateTypes[0] = typeof(RiftBaseState);
-            entityStateTypes[1] = typeof(RiftOffState);
-            entityStateTypes[2] = typeof(RiftOnState);
-            entityStateTypes[3] = typeof(RiftCompleteState);
-
-        }
-        public static void Init()
-        {
             artifactCR = ScriptableObject.CreateInstance<ArtifactDef>();
             artifactCR.nameToken = "ARTIFACT_CRCORE_NAME";
             artifactCR.descriptionToken = "ARTIFACT_CRCORE_DESC";
@@ -46,6 +29,7 @@ namespace ChampionsRingPlugin.Content
             artifactCR.smallIconSelectedSprite = Assets.artifactChampionOn;
             artifactCR.smallIconDeselectedSprite = Assets.artifactChampionOff;
             artifactCR.pickupModelPrefab = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            ContentPack.artifactDefs.Add(new ArtifactDef[] { artifactCR });
 
 
             voidDebuffDef = ScriptableObject.CreateInstance<BuffDef>();
@@ -63,7 +47,36 @@ namespace ChampionsRingPlugin.Content
             protectionBuffDef.iconSprite = Resources.Load<Sprite>("textures/bufficons/texBuffNullifiedIcon");
             protectionBuffDef.isDebuff = false;
             Debug.Log("Initalized Buff: " + protectionBuffDef.name);
-            initalized = true;
+
+            ContentPack.buffDefs.Add(new BuffDef[] { protectionBuffDef, voidDebuffDef });
+
+            ContentPack.entityStateTypes.Add(new Type[] { typeof(RiftBaseState), typeof(RiftOffState), typeof(RiftOnState), typeof(RiftCompleteState) });
+        }
+
+        private static void AddCustomContent(ContentManager.AddContentPackProviderDelegate addContentPackProvider)
+        {
+
+            addContentPackProvider(new CRContentPackProvider());
+        }
+
+        public IEnumerator FinalizeAsync(FinalizeAsyncArgs args)
+        {
+            args.ReportProgress(1);
+            yield break;
+        }
+
+        public IEnumerator GenerateContentPackAsync(GetContentPackAsyncArgs args)
+        {
+            ContentPack.Copy(ContentPack, args.output);
+
+            args.ReportProgress(1);
+            yield break;
+        }
+
+        public IEnumerator LoadStaticContentAsync(LoadStaticContentAsyncArgs args)
+        {
+            args.ReportProgress(1);
+            yield break;
         }
     }
 }

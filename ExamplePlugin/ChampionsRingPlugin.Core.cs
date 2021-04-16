@@ -22,7 +22,7 @@ using R2API.Networking;
 namespace ChampionsRingPlugin.Core
 {
     [BepInDependency("com.bepis.r2api")]
-    [BepInPlugin("PlasmaCore.CRCore3", "ChampionsRingPlugin", "0.0.0")]
+    [BepInPlugin("PlasmaCore.CRCore3", "ChampionsRingPlugin", "0.0.10")]
     [R2APISubmoduleDependency(nameof(LanguageAPI), nameof(PrefabAPI), nameof(ResourcesAPI), nameof(NetworkingAPI))]
     [NetworkCompatibility(CompatibilityLevel.EveryoneMustHaveMod, VersionStrictness.EveryoneNeedSameModVersion)]
 
@@ -30,8 +30,14 @@ namespace ChampionsRingPlugin.Core
     //BaseUnityPlugin itself inherits from MonoBehaviour, so you can use this as a reference for what you can declare and use in your plugin class: https://docs.unity3d.com/ScriptReference/MonoBehaviour.html
     public class CRCore3 : BaseUnityPlugin
     {
-        /*public static ConfigFile CustomConfigFile = new ConfigFile(Paths.ConfigPath + "\\PlasmaCore.BaseMod.cfg", true);
-        public static ConfigEntry<bool> exampleConfig = CustomConfigFile.Bind<bool>("BaseMod Config", "Enable", true, "Enable the only function of this mod.");*/
+        public static ConfigFile CustomConfigFile = new ConfigFile(Paths.ConfigPath + "\\PlasmaCore.ArtifactOfVoid.cfg", true);
+        public static ConfigEntry<float> creditMultiplier = CustomConfigFile.Bind<float>("Artifact of Void", "Credit Multiplier per round", 0.20f, "Credit multiplier for combat directors");
+        public static ConfigEntry<float> creditsBase = CustomConfigFile.Bind<float>("Artifact of Void", "Credit Multiplier base", 50.0f, "Base credits for the director to start with");
+
+        public static ConfigEntry<float> voidDegenerationRate = CustomConfigFile.Bind<float>("Artifact of Void", "Void Degeneration Rate", 2.0f, "Percent max health per second lost in the void");
+        public static ConfigEntry<bool> dropRewards = CustomConfigFile.Bind<bool>("Artifact of Void", "Rift Rewards Drop", true, "Rifts drop reward on end.");
+        public static ConfigEntry<bool> dropTeleRewards = CustomConfigFile.Bind<bool>("Artifact of Void", "Teleporter Rewards Drop", true, "Teleporter drops a red reward on end.");
+        public static ConfigEntry<float> interactibleCreditMultiplier = CustomConfigFile.Bind<float>("Artifact of Void", "Credit Multiplier", 1.0f, "Multiplier for interactible credits.");
 
         public static string[] AIBlacklist = new string[]
         {
@@ -60,7 +66,8 @@ namespace ChampionsRingPlugin.Core
             "WardOnLevel",
             "BarrierOnKill",
             "BarrierOnOverHeal",
-            "BossDamageBonus"
+            "BossDamageBonus",
+            "JumpBoost"
         };
         public static string[] AIBlacklistLunar = new string[]
         {
@@ -82,17 +89,18 @@ namespace ChampionsRingPlugin.Core
             "RoboBallBuddy",
             "SprintWisp"
         };
+        //Mega, make water go up here
         public static IDictionary<string, int> itemCountOverrides = new Dictionary<string, int>();
 
         public static CRRunController runController;
         public CRCore3()
         {
             NetworkingAPI.RegisterMessageType<CRMissionNetworkMessage>();
+            NetworkingAPI.RegisterMessageType<CRTeleportNetworkMessage>();
             itemCountOverrides.Add("ArmorPlate", 1);
             itemCountOverrides.Add("ArmorReductionOnHit", 3);
             itemCountOverrides.Add("Bear", 1);
-            itemCountOverrides.Add("Behemoth", 3);
-            itemCountOverrides.Add("BounceNearby", 2);
+            itemCountOverrides.Add("Behemoth", 2);
             itemCountOverrides.Add("Clover", 2);
             itemCountOverrides.Add("FireRing", 1);
             itemCountOverrides.Add("FlatHealth", 10);
@@ -103,9 +111,9 @@ namespace ChampionsRingPlugin.Core
             itemCountOverrides.Add("Plant", 10);
             itemCountOverrides.Add("SecondarySkillMagazine", 10);
             itemCountOverrides.Add("Seed", 20);
-            itemCountOverrides.Add("SlowOnHit", 2);
+            itemCountOverrides.Add("SlowOnHit", 1);
             itemCountOverrides.Add("UtilitySkillMagazine", 2);
-            itemCountOverrides.Add("BleedOnHit", 11);
+            itemCountOverrides.Add("BleedOnHit", 5);
         }
         public void Start()
         {
@@ -120,14 +128,9 @@ namespace ChampionsRingPlugin.Core
         {
             Assets.PopulateAssets();
 
-            On.RoR2.ContentManager.SetContentPacks += (orig, packs) =>
-            {
-                packs.Add(new CRContentPack());
-                orig(packs);
-            };
 
             LanguageAPI.Add("ARTIFACT_CRCORE_NAME", "Artifact of Void");
-            LanguageAPI.Add("ARTIFACT_CRCORE_DESC", "Enables Champion's Ring 3 gamemode");
+            LanguageAPI.Add("ARTIFACT_CRCORE_DESC", "Breaks the containment of the void realm.");
 
             LanguageAPI.Add("OBJECTIVE_RIFT_CHARGING_TOKEN", "Close The Rift ({0}%)");
             LanguageAPI.Add("OBJECTIVE_RIFT_INACTIVE_TOKEN", "Enter The Rift ({0}%)");
@@ -138,10 +141,8 @@ namespace ChampionsRingPlugin.Core
 
             LanguageAPI.Add("CRRIFT_INTEGRATE_ENEMY", "[WARNING]: {0} was released from the void!");
             LanguageAPI.Add("CRRIFT_INTEGRATE_ITEM", "[WARNING]: {0} was integrated from the void!");
-            if (!CRContentPack.initalized)
-            {
-                CRContentPack.Init();
-            }
+
+            CRContentPackProvider.Init();
             PrefabManager.Init();
 
 
@@ -150,7 +151,7 @@ namespace ChampionsRingPlugin.Core
                 orig(self);
                 if (RunArtifactManager.instance)
                 {
-                    if (RunArtifactManager.instance.IsArtifactEnabled(CRContentPack.artifactCR.artifactIndex))
+                    if (RunArtifactManager.instance.IsArtifactEnabled(CRContentPackProvider.artifactCR.artifactIndex))
                     {
                         runController = ScriptableObject.CreateInstance<CRRunController>();
 
@@ -158,6 +159,7 @@ namespace ChampionsRingPlugin.Core
                         On.RoR2.SceneDirector.Start += OnSceneStart;
                         On.RoR2.CharacterBody.UpdateAllTemporaryVisualEffects += OnUpdateVisualEffects;
                         On.RoR2.TeleporterInteraction.OnInteractionBegin += OnTeleporterInteract;
+                        On.RoR2.SceneDirector.PopulateScene += OnPopulateScene;
                         Debug.Log("[CRCore3]: Hooks added.");
                     }
                     else
@@ -166,6 +168,7 @@ namespace ChampionsRingPlugin.Core
                         On.RoR2.SceneDirector.Start -= OnSceneStart;
                         On.RoR2.CharacterBody.UpdateAllTemporaryVisualEffects -= OnUpdateVisualEffects;
                         On.RoR2.TeleporterInteraction.OnInteractionBegin -= OnTeleporterInteract;
+                        On.RoR2.SceneDirector.PopulateScene -= OnPopulateScene;
                         Debug.Log("[CRCore3]: Hooks removed.");
                     }
                 }
@@ -174,7 +177,7 @@ namespace ChampionsRingPlugin.Core
             On.RoR2.Run.OnDestroy += (orig, self) =>
             {
                 orig(self);
-                if (RunArtifactManager.instance && RunArtifactManager.instance.IsArtifactEnabled(CRContentPack.artifactCR.artifactIndex))
+                if (RunArtifactManager.instance && RunArtifactManager.instance.IsArtifactEnabled(CRContentPackProvider.artifactCR.artifactIndex))
                 {
                     Destroy(runController);
 
@@ -182,10 +185,13 @@ namespace ChampionsRingPlugin.Core
                     On.RoR2.SceneDirector.Start -= OnSceneStart;
                     On.RoR2.CharacterBody.UpdateAllTemporaryVisualEffects -= OnUpdateVisualEffects;
                     On.RoR2.TeleporterInteraction.OnInteractionBegin -= OnTeleporterInteract;
+                    On.RoR2.SceneDirector.PopulateScene -= OnPopulateScene;
                     Debug.Log("[CRCore3]: Hooks removed.");
                 }
             };
         }
+
+
         public void OnTeleporterInteract(On.RoR2.TeleporterInteraction.orig_OnInteractionBegin orig, TeleporterInteraction self, Interactor interactor)
         {
             orig(self, interactor);
@@ -208,10 +214,12 @@ namespace ChampionsRingPlugin.Core
                 vfxmanager.characterBody = self;
             }
         }
-        public void TeleporterPlaceHook(On.RoR2.SceneDirector.orig_PlaceTeleporter orig, SceneDirector self) //NOTE: DEAD END HOOK!!
+        public void TeleporterPlaceHook(On.RoR2.SceneDirector.orig_PlaceTeleporter orig, SceneDirector self) //NOTE: NOT DEAD END HOOK ANYMORE!!
         {
             if (!self.teleporterInstance && self.teleporterSpawnCard)
             {
+                self.teleporterSpawnCard = null;
+                orig(self);
                 if (PrefabManager.iscCorruptedTeleporter)
                 {
                     self.teleporterInstance = self.directorCore.TrySpawnObject(new DirectorSpawnRequest(PrefabManager.iscCorruptedTeleporter, new DirectorPlacementRule
@@ -259,6 +267,10 @@ namespace ChampionsRingPlugin.Core
                 self.teleporterInstance.GetComponent<CRMissionController>().voidRifts = vents;
                 self.teleporterInstance.GetComponent<CRMissionController>().Start();
             }
+            else
+            {
+                orig(self);
+            }
         }
         public void OnSceneStart(On.RoR2.SceneDirector.orig_Start orig, SceneDirector self)
         {
@@ -267,6 +279,14 @@ namespace ChampionsRingPlugin.Core
             {
                 Destroy(GameObject.Find("SMSkyboxPrefab"));
             }
+        }
+
+        public void OnPopulateScene(On.RoR2.SceneDirector.orig_PopulateScene orig, SceneDirector self)
+        {
+            Debug.Log("[CRCore3]: Previous SceneDirector interactible credits: " + self.interactableCredit.ToString());
+            self.interactableCredit = (int)(interactibleCreditMultiplier.Value * self.interactableCredit);
+            Debug.Log("[CRCore3]: Updated SceneDirector interactible credits to: " + self.interactableCredit.ToString());
+            orig(self);
         }
         //public void OnGenerateInteractableCardSelection(SceneDirector director, DirectorCardCategorySelection cardSelection)
         //{

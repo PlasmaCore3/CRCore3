@@ -50,6 +50,7 @@ namespace ChampionsRingPlugin.Components
         public List<PickupIndex> availableTier3DropList;
 
         public GameObject[] voidRifts = new GameObject[roundsCount];
+        public ChildLocator orbLocator;
 
         float degenTimer = 0;
         public static float degenTickFrequency = 1f;
@@ -58,6 +59,7 @@ namespace ChampionsRingPlugin.Components
         public BuffWard voidWard;
         public void Start()
         {
+            target.holdoutZoneController.onCharged.AddListener(this.OnFinish);
             if (Run.instance)
             {
                 availableTier1DropList = Run.instance.availableTier1DropList.Where(new Func<PickupIndex, bool>(ArenaMissionController.IsPickupAllowedForMonsters)).ToList<PickupIndex>();
@@ -104,7 +106,6 @@ namespace ChampionsRingPlugin.Components
         {
             BeginRound(base.gameObject);
         }
-
         [Server]
         public void ModifySpawnedMasters(GameObject targetGameObject)
         {
@@ -124,43 +125,110 @@ namespace ChampionsRingPlugin.Components
             }
             component.inventory.AddItemsFrom(this.inventory);
         }
-
         public void FixedUpdate()
         {
             //Make protection ward match teleported bubble, and void bubble up to twice the full radius.
             protectionWard.radius = target.holdoutZoneController.currentRadius;
 
-            if (NetworkServer.active)
+            switch (roundsCleared)
             {
-                NetMessageExtensions.Send(new CRMissionNetworkMessage { riftsCompleted = this.roundsCleared }, R2API.Networking.NetworkDestination.Clients);
+                case 0:
+                    break;
+                case 4:
+                    if (orbLocator.FindChild("OrbW").gameObject.activeSelf == false)
+                    {
+                        orbLocator.FindChild("OrbW").gameObject.SetActive(true);
+                    }
+                    break;
+                case 3:
+                    if (orbLocator.FindChild("OrbE").gameObject.activeSelf == false)
+                    {
+                        orbLocator.FindChild("OrbE").gameObject.SetActive(true);
+                    }
+                    break;
+                case 2:
+                    if (orbLocator.FindChild("OrbS").gameObject.activeSelf == false)
+                    {
+                        orbLocator.FindChild("OrbS").gameObject.SetActive(true);
+                    }
+                    break;
+                case 1:
+                    if (orbLocator.FindChild("OrbN").gameObject.activeSelf == false)
+                    {
+                        orbLocator.FindChild("OrbN").gameObject.SetActive(true);
+                    }
+                    break;
+                case 5:
+                    if (orbLocator.transform.GetChild(0).GetComponent<ParticleSystem>().isStopped == false)
+                    {
+                        orbLocator.transform.GetChild(0).GetComponent<ParticleSystem>().Stop(true, ParticleSystemStopBehavior.StopEmitting);
+                    }
+                    if (orbLocator.FindChild("OrbN").gameObject.activeSelf == false)
+                    {
+                        orbLocator.FindChild("OrbN").gameObject.SetActive(true);
+                    }
+                    if (orbLocator.FindChild("OrbS").gameObject.activeSelf == false)
+                    {
+                        orbLocator.FindChild("OrbS").gameObject.SetActive(true);
+                    }
+                    if (orbLocator.FindChild("OrbE").gameObject.activeSelf == false)
+                    {
+                        orbLocator.FindChild("OrbE").gameObject.SetActive(true);
+                    }
+                    if (orbLocator.FindChild("OrbW").gameObject.activeSelf == false)
+                    {
+                        orbLocator.FindChild("OrbW").gameObject.SetActive(true);
+                    }
+                    break;
             }
+
 
             if (!target.isCharged)
             {
                 voidWard.radius = (protectionWard.radius * 2) + 100 + (15 * roundsCleared);
             }
-            else if (voidWard.radius > 0.01)
+            else if (voidWard.radius > 0.001)
             {
-                voidWard.radius /= 1.1f;
+                voidWard.radius /= 1.05f;
+                if (orbLocator)
+                {
+                    orbLocator.transform.localScale /= 1.05f;
+                }
+            }
+            else if (orbLocator)
+            {
+                orbLocator.transform.localScale /= 1.01f;
             }
 
 
-            this.degenTimer += Time.fixedDeltaTime;
-            if (this.degenTimer > 1f / degenTickFrequency)
+            if (NetworkServer.active)
             {
-                this.degenTimer -= 1f / degenTickFrequency;
-                foreach (TeamComponent teamComponent in TeamComponent.GetTeamMembers(TeamIndex.Player))
+                NetMessageExtensions.Send(new CRMissionNetworkMessage { riftsCompleted = this.roundsCleared }, R2API.Networking.NetworkDestination.Clients);
+
+                this.degenTimer += Time.fixedDeltaTime;
+                if (this.degenTimer > 1f / degenTickFrequency)
                 {
-                    if (!teamComponent.body.HasBuff(BuffCatalog.FindBuffIndex("CRVoidProtectionBuff")) && teamComponent.body.HasBuff(BuffCatalog.FindBuffIndex("CRVoidDebuff")))
+                    this.degenTimer -= 1f / degenTickFrequency;
+                    foreach (TeamComponent teamComponent in TeamComponent.GetTeamMembers(TeamIndex.Player))
                     {
-                        float damage = (3.0f / 100f) / degenTickFrequency * teamComponent.body.healthComponent.fullCombinedHealth;
-                        teamComponent.body.healthComponent.TakeDamage(new DamageInfo
+                        if (!teamComponent.body.HasBuff(BuffCatalog.FindBuffIndex("CRVoidProtectionBuff")) && teamComponent.body.HasBuff(BuffCatalog.FindBuffIndex("CRVoidDebuff")) && !(teamComponent.body.baseNameToken.Contains("DRONE") || teamComponent.body.baseNameToken.Contains("TURRET")))
                         {
-                            damage = damage,
-                            position = teamComponent.body.corePosition,
-                            damageType = DamageType.Silent
-                        });
+                            float damage = (CRCore3.voidDegenerationRate.Value / 100f) / degenTickFrequency * teamComponent.body.healthComponent.fullCombinedHealth;
+                            teamComponent.body.healthComponent.TakeDamage(new DamageInfo
+                            {
+                                damage = damage,
+                                position = teamComponent.body.corePosition,
+                                damageType = DamageType.Silent
+                            });
+                        }
                     }
+                }
+            }
+            else
+            {
+                if (roundsCleared >= roundsCount)
+                {
+                    ObjectivePanelController.collectObjectiveSources -= OnCollectObjectives;
                 }
             }
         }
@@ -168,10 +236,19 @@ namespace ChampionsRingPlugin.Components
         {
             //Add monster card to, and activate combat director
             //^ Make directors more powerful if more events are active?
-
+            if (this.roundsStarted >= 5) { return; }
             roundsStarted++;
             if (NetworkServer.active)
             {
+                foreach (TeamComponent teamComponent in TeamComponent.GetTeamMembers(TeamIndex.Player))
+                {
+                    if (teamComponent.body && teamComponent.body.healthComponent)
+                    {
+                        teamComponent.body.healthComponent.HealFraction(0.75f, new ProcChainMask());
+                        teamComponent.body.healthComponent.RechargeShieldFull();
+                    }
+                }
+
                 if (monsterCards.Count <= 0)
                 {
                     Debug.LogWarning("[CRCore3]: CRMissionController.BeginRound - No monsters left to chose from! Attempting to get new SpawnCards...");
@@ -240,11 +317,17 @@ namespace ChampionsRingPlugin.Components
                 {
                     if (i >= directors.Length) { break; }
                     directors[i].OverrideCurrentMonsterCard(pickedMonsterCards[i]);
-                    directors[i].monsterCredit += ((50 + 0.15f * this.roundsStarted) * Run.instance.difficultyCoefficient) / pickedMonsterCards.Count;
-                    directors[i].creditMultiplier = 0.15f * this.roundsStarted / pickedMonsterCards.Count;
-                    directors[i].monsterSpawnTimer = 0;
+                    directors[i].monsterCredit = ((CRCore3.creditsBase.Value + CRCore3.creditMultiplier.Value * this.roundsStarted) * Run.instance.difficultyCoefficient) / pickedMonsterCards.Count;
+                    directors[i].creditMultiplier = CRCore3.creditMultiplier.Value * this.roundsStarted / pickedMonsterCards.Count;
+                    directors[i].targetPlayers = false;
                     directors[i].currentSpawnTarget = centerPoint;
-                    directors[i].enabled = true;
+                    if (NetworkServer.active)
+                    {
+                        directors[i].enabled = true;
+                        directors[i].monsterSpawnTimer = 0;
+                    }
+                    Debug.Log("[CRCore3]: Updated CombatDirector" + i.ToString() + "'s credits to: " + directors[i].monsterCredit.ToString());
+                    Debug.Log("[CRCore3]: Updated CombatDirector" + i.ToString() + "'s multiplier to: " + directors[i].creditMultiplier.ToString());
                 }
 
                 //Add items to monster inventory
@@ -255,12 +338,12 @@ namespace ChampionsRingPlugin.Components
                 {
                     default:
                         list = availableTier1DropList;
-                        count = rng.RangeInt(3, 7);
+                        count = rng.RangeInt(3, 6);
                         break;
                     case 3:
                     case 4:
                         list = availableTier2DropList;
-                        count = rng.RangeInt(2, 5);
+                        count = rng.RangeInt(2, 4);
                         break;
                     case 5:
                         list = availableTier3DropList;
@@ -279,7 +362,7 @@ namespace ChampionsRingPlugin.Components
                     bool badItem = false;
                     foreach (string itemName in CRCore3.AIBlacklist)
                     {
-                        if (ItemCatalog.GetItemDef(itemIndex).nameToken.ToLower().Contains(itemName.ToLower()))
+                        if (ItemCatalog.GetItemDef(itemIndex).name.ToLower().Contains(itemName.ToLower()))
                         {
                             badItem = true;
                             break;
@@ -319,7 +402,7 @@ namespace ChampionsRingPlugin.Components
                                 bool badItem = false;
                                 foreach (string itemName in CRCore3.AIBlacklistBoss)
                                 {
-                                    if (ItemCatalog.GetItemDef(itemIndex).nameToken.ToLower().Contains(itemName.ToLower()))
+                                    if (ItemCatalog.GetItemDef(itemIndex).name.ToLower().Contains(itemName.ToLower()))
                                     {
                                         badItem = true;
                                         break;
@@ -345,7 +428,7 @@ namespace ChampionsRingPlugin.Components
                                 bool badItem = false;
                                 foreach (string itemName in CRCore3.AIBlacklistLunar)
                                 {
-                                    if (ItemCatalog.GetItemDef(itemIndex).nameToken.ToLower().Contains(itemName.ToLower()))
+                                    if (ItemCatalog.GetItemDef(itemIndex).name.ToLower().Contains(itemName.ToLower()))
                                     {
                                         badItem = true;
                                         break;
@@ -365,42 +448,58 @@ namespace ChampionsRingPlugin.Components
 
                 foreach (GameObject rift in voidRifts)
                 {
-                    if (rift.GetComponent<EntityStateMachine>().state is RiftCompleteState)
+                    if (rift.GetComponent<EntityStateMachine>().state is RiftOffState)
                     {
-                        rift.GetComponent<PurchaseInteraction>().available = false;
-                    }
-                    else
-                    {
-                        rift.GetComponent<PurchaseInteraction>().available = roundsCleared >= roundsStarted;
+                        (rift.GetComponent<EntityStateMachine>().state as RiftOffState).teleportTarget = centerPoint;
                     }
                 }
             }
+
+        }
+        public void OnFinish(HoldoutZoneController holdoutZone)
+        {
+            EndRound();
         }
         public void EndRound()
         {
             roundsCleared++;
-            foreach (GameObject rift in voidRifts)
+            if (NetworkServer.active)
             {
-                if (rift.GetComponent<EntityStateMachine>().state is RiftCompleteState)
+                foreach (TeamComponent teamComponent in TeamComponent.GetTeamMembers(TeamIndex.Player))
                 {
-                    rift.GetComponent<PurchaseInteraction>().available = true;
+                    if (teamComponent.body && teamComponent.body.healthComponent)
+                    {
+                        teamComponent.body.healthComponent.HealFraction(0.75f, new ProcChainMask());
+                        teamComponent.body.healthComponent.RechargeShieldFull();
+                    }
                 }
-                else
+                foreach (GameObject rift in voidRifts)
                 {
-                    rift.GetComponent<PurchaseInteraction>().available = roundsCleared >= roundsStarted;
+                    if (rift.GetComponent<EntityStateMachine>().state is RiftOffState)
+                    {
+                        (rift.GetComponent<EntityStateMachine>().state as RiftOffState).teleportTarget = null;
+                    }
+                }
+                foreach (CombatDirector director in directors)
+                {
+                    director.creditMultiplier *= 0.5f;
+                    director.targetPlayers = true;
+                }
+                if (roundsCleared == 5)
+                {
+                    if (CRCore3.dropTeleRewards.Value)
+                    {
+                        List<PickupIndex> list = Run.instance.availableTier3DropList;
+                        PickupDropletController.CreatePickupDroplet(CRMissionController.instance.rng.NextElementUniform<PickupIndex>(list), orbLocator.transform.position, Vector3.up * 30);
+                    }
                 }
             }
+
             if (roundsCleared >= roundsCount)
             {
                 ObjectivePanelController.collectObjectiveSources -= OnCollectObjectives;
                 target.locked = false;
             }
-            foreach (CombatDirector director in directors)
-            {
-                director.creditMultiplier /= 2;
-                director.monsterCredit = 0;
-            }
-
         }
         public void OnEnable()
         {
@@ -482,8 +581,8 @@ namespace ChampionsRingPlugin.Components
 
         public void Update()
         {
-            UpdateSingleTemporaryVisualEffect(ref voidSickEffect, PrefabManager.voidSickEffect, characterBody.radius, !characterBody.HasBuff(CRContentPack.protectionBuffDef) && characterBody.HasBuff(CRContentPack.voidDebuffDef), characterBody);
-            UpdateSingleTemporaryVisualEffect(ref voidSafeEffect, PrefabManager.voidSafeEffect, characterBody.radius, characterBody.HasBuff(CRContentPack.protectionBuffDef), characterBody);
+            UpdateSingleTemporaryVisualEffect(ref voidSickEffect, PrefabManager.voidSickEffect, characterBody.radius, !characterBody.HasBuff(CRContentPackProvider.protectionBuffDef) && characterBody.HasBuff(CRContentPackProvider.voidDebuffDef), characterBody);
+            UpdateSingleTemporaryVisualEffect(ref voidSafeEffect, PrefabManager.voidSafeEffect, characterBody.radius, characterBody.HasBuff(CRContentPackProvider.protectionBuffDef), characterBody);
 
         }
         private void UpdateSingleTemporaryVisualEffect(ref TemporaryVisualEffect tempEffect, GameObject resource, float effectRadius, bool active, CharacterBody characterBody, string childLocatorOverride = "")
@@ -569,6 +668,36 @@ namespace ChampionsRingPlugin.Components
         public void Serialize(NetworkWriter writer)
         {
             writer.Write((Int32)riftsCompleted);
+        }
+    }
+    public class CRTeleportNetworkMessage : INetMessage, ISerializableObject
+    {
+        public GameObject target;
+        public Vector3 position;
+        public bool fromServer;
+        public void Deserialize(NetworkReader reader)
+        {
+            target = reader.ReadGameObject();
+            position = reader.ReadVector3();
+            fromServer = reader.ReadBoolean();
+        }
+
+        public void OnReceived()
+        {
+            if (Util.HasEffectiveAuthority(target) || NetworkServer.active)
+            {
+                TeleportHelper.TeleportBody(target.GetComponent<CharacterBody>(), position);
+                if (!fromServer)
+                {
+                    NetMessageExtensions.Send(new CRTeleportNetworkMessage { target = target, position = position, fromServer = true }, R2API.Networking.NetworkDestination.Clients);
+                }
+            }
+        }
+        public void Serialize(NetworkWriter writer)
+        {
+            writer.Write((GameObject)target);
+            writer.Write((Vector3)position);
+            writer.Write((bool)fromServer);
         }
     }
 }

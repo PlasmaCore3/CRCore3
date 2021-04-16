@@ -8,6 +8,9 @@ using System.Text;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Networking;
+using EntityStates.NullifierMonster;
+using R2API.Networking.Interfaces;
+using ChampionsRingPlugin.Core;
 
 namespace ChampionsRingPlugin.EntityStates
 {
@@ -37,6 +40,7 @@ namespace ChampionsRingPlugin.EntityStates
     }
     class RiftOffState : RiftBaseState
     {
+        public GameObject teleportTarget;
         public override void OnEnter()
         {
             base.OnEnter();
@@ -55,8 +59,39 @@ namespace ChampionsRingPlugin.EntityStates
 
         public void OnInteract(Interactor interactor)
         {
-            this.outer.SetNextStateToMain();
-            base.gameObject.GetComponent<PurchaseInteraction>().available = false;
+            if (teleportTarget && interactor.gameObject.GetComponent<CharacterBody>())
+            {
+                EffectManager.SpawnEffect(GenericCharacterDeath.voidDeathEffect, new EffectData
+                {
+                    origin = interactor.gameObject.transform.position,
+                    scale = 5f
+                }, true);
+                if (Util.HasEffectiveAuthority(interactor.gameObject))
+                {
+                    TeleportHelper.TeleportBody(interactor.gameObject.GetComponent<CharacterBody>(), teleportTarget.transform.position);
+                }
+                else
+                {
+                    if (NetworkServer.active)
+                    {
+                        NetMessageExtensions.Send(new CRTeleportNetworkMessage { target = interactor.gameObject, position = teleportTarget.transform.position, fromServer = true }, R2API.Networking.NetworkDestination.Clients);
+                    }
+                    else
+                    {
+                        NetMessageExtensions.Send(new CRTeleportNetworkMessage { target = interactor.gameObject, position = teleportTarget.transform.position, fromServer = false }, R2API.Networking.NetworkDestination.Server);
+                    }
+                }
+                EffectManager.SpawnEffect(DeathState.deathExplosionEffect, new EffectData
+                {
+                    origin = teleportTarget.transform.position + new Vector3(0, 3, 0),
+                    scale = 5f
+                }, true);
+            }
+            else
+            {
+                this.outer.SetNextStateToMain();
+                base.gameObject.GetComponent<PurchaseInteraction>().available = false;
+            }
         }
     }
 
@@ -69,15 +104,6 @@ namespace ChampionsRingPlugin.EntityStates
             base.GetComponent<HoldoutZoneController>().onCharged.AddListener(new UnityAction<HoldoutZoneController>(this.OnFinish));
             base.GetComponent<HoldoutZoneController>().enabled = true;
 
-            foreach (TeamComponent teamComponent in TeamComponent.GetTeamMembers(TeamIndex.Player))
-            {
-                if (teamComponent.body && teamComponent.body.healthComponent)
-                {
-                    teamComponent.body.healthComponent.HealFraction(1.0f, new ProcChainMask());
-                    teamComponent.body.healthComponent.RechargeShieldFull();
-                }
-            }
-
             var particleSystem2 = childLocator.FindChild("ParticleSystemStart").gameObject;
             particleSystem2.SetActive(true);
             childLocator.FindChild("Beacon").gameObject.GetComponent<ParticleSystem>().Stop(true, ParticleSystemStopBehavior.StopEmitting);
@@ -88,16 +114,19 @@ namespace ChampionsRingPlugin.EntityStates
         {
             base.FixedUpdate();
             protectionBuffWard.radius = base.GetComponent<HoldoutZoneController>().currentRadius;
+            voidBuffWard.radius = base.GetComponent<HoldoutZoneController>().currentRadius + 75;
+            if (!NetworkServer.active && base.GetComponent<HoldoutZoneController>().charge >= 0.99)
+            {
+                this.outer.SetNextState(new RiftCompleteState());
+            }
         }
         public override void OnExit()
         {
             base.OnExit();
             base.GetComponent<HoldoutZoneController>().onCharged.RemoveListener(new UnityAction<HoldoutZoneController>(this.OnFinish));
-            base.GetComponent<HoldoutZoneController>().enabled = false;
         }
         public void OnFinish(HoldoutZoneController holdoutZone)
         {
-            base.missionController.EndRound();
             this.outer.SetNextState(new RiftCompleteState());
         }
     }
@@ -107,11 +136,24 @@ namespace ChampionsRingPlugin.EntityStates
         public override void OnEnter()
         {
             base.OnEnter();
+            base.missionController.EndRound();
+            base.outer.gameObject.GetComponent<PurchaseInteraction>().available = false;
+            base.GetComponent<HoldoutZoneController>().enabled = false;
             var particleSystem = childLocator.FindChild("ParticleSystemBase").gameObject.GetComponent<ParticleSystem>();
             particleSystem.Stop( true, ParticleSystemStopBehavior.StopEmitting );
             var particleSystem2 = childLocator.FindChild("ParticleSystemFinish").gameObject;
             particleSystem2.SetActive(true);
             Util.PlaySound("Stop_ui_obj_nullWard_charge_loop", base.gameObject);
+
+            if (CRCore3.dropRewards.Value && NetworkServer.active)
+            {
+                List<PickupIndex> list = Run.instance.availableTier1DropList;
+                if (CRMissionController.instance.roundsStarted > 2)
+                {
+                    list = Run.instance.availableTier2DropList;
+                }
+                PickupDropletController.CreatePickupDroplet(CRMissionController.instance.rng.NextElementUniform<PickupIndex>(list), this.gameObject.transform.position, Vector3.up * 30);
+            }
         }
         public override void FixedUpdate()
         {

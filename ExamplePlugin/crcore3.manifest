@@ -1,12 +1,12 @@
 ManifestFileVersion: 0
-CRC: 2441295336
+CRC: 201225353
 Hashes:
   AssetFileHash:
     serializedVersion: 2
-    Hash: 114f721de066c0f6da64ed3224287d99
+    Hash: 4d8375808f66a957f2dd52f7113c14b0
   TypeTreeHash:
     serializedVersion: 2
-    Hash: c51263dbe1e20beb9ad98ea303ed841c
+    Hash: 30a19bcf65334a6467cd0d51ae0d4a60
 HashAppended: 0
 ClassTypes:
 - Class: 1
@@ -24,6 +24,14 @@ ClassTypes:
 - Class: 43
   Script: {instanceID: 0}
 - Class: 48
+  Script: {instanceID: 0}
+- Class: 74
+  Script: {instanceID: 0}
+- Class: 90
+  Script: {instanceID: 0}
+- Class: 91
+  Script: {instanceID: 0}
+- Class: 95
   Script: {instanceID: 0}
 - Class: 114
   Script: {fileID: 11500000, guid: 48a79b01ea5641d4aa6daa2e23605641, type: 3}
@@ -49,4 +57,5 @@ Assets:
 - Assets/CRCore3/Prefabs/VoidRift.prefab
 - Assets/CRCore3/PostProcess/voidSafePPP.asset
 - Assets/CRCore3/PostProcess/voidSickPPP.asset
+- Assets/CRCore3/Prefabs/TeleporterRift.prefab
 Dependencies: []
